@@ -12,6 +12,12 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PORT = process.env.PORT || 3000;
 
+// 🗂️ Almacenar usuarios y sus últimas interacciones
+const userSessions = new Map();
+
+// ⏰ 24 horas en milisegundos
+const WELCOME_TIMEOUT = 24 * 60 * 60 * 1000;
+
 // 👉 Ruta GET para la verificación de Facebook
 app.get("/webhook", (req, res) => {
   let mode = req.query["hub.mode"];
@@ -50,11 +56,40 @@ app.post("/webhook", (req, res) => {
 
 // 👉 Función para responder mensajes
 function handleMessage(sender_psid, received_message) {
-  let response = {
-    text: "🐶 Bienvenido a *CASIS accesorios para tu mascota*. Gracias por escribirnos ❤️"
-  };
-
-  callSendAPI(sender_psid, response);
+  const now = Date.now();
+  const userSession = userSessions.get(sender_psid);
+  
+  // Verificar si necesita mensaje de bienvenida
+  let needsWelcome = false;
+  
+  if (!userSession) {
+    // Usuario nuevo - primera vez
+    needsWelcome = true;
+  } else {
+    // Usuario existente - verificar si han pasado 24 horas
+    const timeSinceLastMessage = now - userSession.lastMessageTime;
+    if (timeSinceLastMessage >= WELCOME_TIMEOUT) {
+      needsWelcome = true;
+    }
+  }
+  
+  // Actualizar o crear sesión del usuario
+  userSessions.set(sender_psid, {
+    lastMessageTime: now,
+    hasReceivedWelcome: needsWelcome ? true : userSession?.hasReceivedWelcome || false
+  });
+  
+  // Enviar mensaje de bienvenida si es necesario
+  if (needsWelcome) {
+    const response = {
+      text: "¡Hola! 👋 Bienvenido a *CASIS accesorios para tu mascota*. Gracias por escribirnos ❤️\n\n¿En qué podemos ayudarte hoy?"
+    };
+    
+    callSendAPI(sender_psid, response);
+    console.log(`📩 Mensaje de bienvenida enviado a usuario: ${sender_psid}`);
+  } else {
+    console.log(`⏭️ Usuario ${sender_psid} ya tiene sesión activa, no se envía bienvenida`);
+  }
 }
 
 // 👉 Llamar a la API de Facebook
