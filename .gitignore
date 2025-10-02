@@ -1,0 +1,14 @@
+# Ignorar node_modules
+node_modules/
+
+# Ignorar variables de entorno
+.env
+
+# Ignorar logs
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Ignorar sistema operativo
+.DS_Store
+Thumbs.db
