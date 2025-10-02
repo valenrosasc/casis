@@ -68,18 +68,26 @@ function handleMessage(from, received_message) {
   if (!userSession) {
     // Usuario nuevo - primera vez
     needsWelcome = true;
+    console.log(`🆕 Usuario nuevo detectado: ${from}`);
   } else {
     // Usuario existente - verificar si han pasado 24 horas
     const timeSinceLastMessage = now - userSession.lastMessageTime;
+    const hoursElapsed = timeSinceLastMessage / (1000 * 60 * 60);
+    
+    console.log(`⏰ Usuario ${from} - Horas desde último mensaje: ${hoursElapsed.toFixed(2)}`);
+    
     if (timeSinceLastMessage >= WELCOME_TIMEOUT) {
       needsWelcome = true;
+      console.log(`⏰ Han pasado más de 24 horas, enviando nueva bienvenida a: ${from}`);
+    } else {
+      console.log(`✋ Usuario ${from} aún en período de 24h, NO se envía bienvenida`);
     }
   }
   
-  // Actualizar o crear sesión del usuario
+  // SIEMPRE actualizar la sesión del usuario (incluso si el envío falla)
   userSessions.set(from, {
     lastMessageTime: now,
-    hasReceivedWelcome: needsWelcome ? true : userSession?.hasReceivedWelcome || false
+    hasReceivedWelcome: userSession?.hasReceivedWelcome || needsWelcome
   });
   
   // Enviar mensaje de bienvenida si es necesario
@@ -87,7 +95,7 @@ function handleMessage(from, received_message) {
     const welcomeMessage = "¡Hola! 👋 Bienvenido a *CASIS accesorios para tu mascota*. Gracias por escribirnos ❤️\n\n¿En qué podemos ayudarte hoy?";
     
     callSendAPI(from, welcomeMessage);
-    console.log(`📩 Mensaje de bienvenida enviado a: ${from}`);
+    console.log(`📩 Intentando enviar mensaje de bienvenida a: ${from}`);
   } else {
     console.log(`⏭️ Usuario ${from} ya tiene sesión activa, no se envía bienvenida`);
   }
@@ -117,9 +125,17 @@ async function callSendAPI(to, message) {
     });
 
     const result = await response.json();
-    console.log("📩 Mensaje de WhatsApp enviado:", result);
+    
+    if (result.error) {
+      console.error("❌ Error de WhatsApp API:", result.error);
+      if (result.error.code === 190) {
+        console.error("🚨 TOKEN INVÁLIDO - Necesitas generar un nuevo token de acceso");
+      }
+    } else {
+      console.log("✅ Mensaje de WhatsApp enviado exitosamente:", result);
+    }
   } catch (error) {
-    console.error("❌ Error al enviar mensaje de WhatsApp:", error);
+    console.error("❌ Error de conexión:", error.message);
   }
 }
 
